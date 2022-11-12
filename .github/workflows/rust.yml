@@ -20,17 +20,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  fmt:
-    runs-on: ubuntu-latest
+  check:
+    strategy:
+    fail-fast: false
+    matrix:
+      os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
     - uses: extractions/setup-just@v1
-    - name: Check fmt
-      run: just check-fmt
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Check
+      run:
+      - just check-fmt
+      - just test
+      - just lint
 
-  test:
-    needs: [fmt]
+  check_after_rebase:
     strategy:
       fail-fast: false
       matrix:
@@ -41,15 +48,13 @@ jobs:
     - uses: actions/checkout@v3
     - uses: extractions/setup-just@v1
     - uses: dtolnay/rust-toolchain@stable
-    - name: Test
-      run: just test
-      
-  lint:
-    needs: [fmt, test]
-    runs-on: ubuntu-latest
+    - name: Check after rebase
+      run:
+      - git rebase main
+      - CONFLICTS=$(git ls-files -u | wc -l)
+      - if [ "$CONFLICTS" -gt 0 ] ; then exit 1 fi
+      - just check-fmt
+      - just test
+      - just lint
 
-    steps:
-    - uses: actions/checkout@v3
-    - uses: extractions/setup-just@v1
-    - name: Lint
-      run: just lint
+  
